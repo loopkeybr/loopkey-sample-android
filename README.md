@@ -15,82 +15,92 @@ If you're interested in learning more about LoopKey, contact us at loopkey@loopk
 In order to scan for devices, your class will need to implement the ReachableDevices.Listener, for example:
 
 ```
-class Example: ReachableDevices.Listener
+class Example: LKReachableDeviceListener
 {
-    var _reachableDevices: ReachableDevices
-    var _doorModel: DoorModel
+    var _reachableDevices: ReachableDevices // Reachable devices obtained via LoopKey SDK Scanner
+    var _doorModel: DoorModel // Model that represents the door you want to open
+    var _loopkeyBLEScanner: LKReachableDevice = LKReachableDeviceImpl.INSTANCE
 }
 ```
 
-Then, you will need to subcribe for notifications as soon as possible in your lifecycle (`onCreate`, `onCreateView`, etc):
+Then, you will need to subcribe for notifications as soon as possible in your lifecycle (`onCreate`, `onCreateView`, etc), or when you want to start your scan process:
 
 ```
-    _reachableDevices.subscribe(this)
+    _loopkeyBLEScanner.subscribe(this)
 ```
 
-On your `onDestroy`, unsubscribe for notifications:
+On your `onDestroy` or when you want to stop scanning, unsubscribe for notifications:
 
 ```
     _reachableDevices.unsubscribe(this)
 ```
 
-Finally, you will need to implement the `onReachableDevices()` method, wich will run every time a new device is detected or gets out of reach. It receives an array of `BluetoothModel` containing the visible devices as the scan time:
+Finally, you will need to implement the `onReachableDevices()` method, wich will run every time a new device is detected or gets out of reach. It receives an array of `LKCommDevice` containing the visible devices as the scan time:
 
 ```
-    override fun onReachableDevices(reachableDevices: Collection<BluetoothModel>) { }
+    override fun onReachableDevices(reachableDevices: List<LKCommDevice>) { }
 ```
 
-Now you have an array of `BluetoothModel`, that you can use for your device retrieval logic.
+Now you have an array of `LKCommDevice`, that you can use for your device retrieval logic.
 
-After you make sure your device is reachable, you may use commands. You may check if a door is in the reachable devices by checking if the serial of the device is in the `BluetoothModel` array, for example:
+After you make sure your device is reachable, you may use commands. You may check if a door is in the reachable devices by checking if the serial of the device is in the `LKCommDevice` array, for example:
 
 ```
-    fun getBluetoothModelFromList(bluetoothModels: Collection<BluetoothModel>, serialCode: String): BluetoothModel?
+    fun get(serial: ByteArray): LKCommDevice?
     {
-        val results = bluetoothModels.filter { Arrays.equals(it.serialCode, SignatureUtils.decodeBase64(serialCode)) }
-        if (results.isNotEmpty()) {
-            return results.first()
+        synchronized(this.reachableDevices) {
+            return reachableDevices.firstOrNull { it.serial.contentEquals(serial) }
         }
-
-        return null
     }
 ```
 
 ### Using commands
 
-The next step is to set the admin and user keys to this device. You may set them directly on the device you've just retrieved.
+The next step is to set the admin and user keys to this device. You may set them directly on the `LKCommDevice` you've just retrieved. This values are obtained from LoopKey API. 
+Admin Key only is necessary if you want to perform Reset/Edit/Update of the lock, otherwhise only the property `key` must be settled.
+
+Both the keys `String`. They come as base64 encoded string from the server API.
 
 ```
-    _doorModel.bluetoothModel = getBluetoothModelFromList(bluetoothModels, YOUR_SERIAL)
-    _doorModel.adminKey = YOUR_ADMIN_KEY
-    _doorModel.key = YOUR_USER_KEY
-```
+    fun LKCommDevice.transform(doorModel: DoorModel)
+    {
+        if (doorModel.key.isNotEmpty()) {
+            this.key = SignatureUtils.decodeBase64(doorModel.key)
+        }
 
-_Both the keys and the serial need to be `String`. They come as base64 encoded string from the server API._
+        if (doorModel.adminKey.isNotEmpty()) {
+            this.adminKey = SignatureUtils.decodeBase64(doorModel.adminKey)
+        }
+    }
 
-With your device ready you'll need transform Door to a CommDevice:
-
-```
-    val commDevice = LKCommDevice(Base64.decode(_doorModel.serial, Base64.DEFAULT)
-    commDevice.key = Base64.decode(_doorModel.key, Base64.DEFAULT)
-    commDevice.adminKey = Base64.decode(_doorModel.adminKey, Base64.DEFAULT)
 ```
 
 Then, get the communicator:
 
 ```
-    val _bleManage: LKReachableDevice
-    val comm = _bleManager.deviceCommunicatorForDevice(commDevice, userId);
+    val commandRunner = LKCommandRunner.instance
 ```
 
 Finally, create command and run then:
 
 ```
-    val command = LKCommandRepository.createUnlockCommand(LKUnlockCommand.Listener)
-    comm.execute(command)
+    val command: LKCommand = createUnlockCommand(object : LKUnlockCommand.Listener {
+                override fun onResponse(response: LKUnlockCommand.Response?) 
+                {
+                    // The unlock occurs with success when the answer LKUnlockCommand.Response.UNLOCKED is obtained. Other options can be checked at the same enum.
+                }
+
+                override fun onError(error: LKCommand.Error?) 
+                {
+                }
+            })
+
+            command.device = commDevice // The LKCommDevice that we created previously.
+            command.userId = 0 // The identifier of the user whom is performing the action. If not appliable just send zero value
+            commandRunner.enqueue(command)
 ```
 
-On `LKUnlockCommand.Listener` you can get the response of LoopKey (`OKOK`, `OKAO`, etc).
+On `LKUnlockCommand.Listener` you can get the response of LoopKey (`UNLOCKED`, `ALREADY_OPEN`, `ALREADY_UNLOCKED`, `SYNC_ISSUE`, `NOT_CONFIGURED`, `UNKNOWN`).
 
 That's it. Your command will be run by the command runner.
 
@@ -138,7 +148,7 @@ You may check a more complete reference on the server API by checking the link: 
 
 MIT License
 
-Copyright (c) 2018 LoopKey
+Copyright (c) 2021 LoopKey
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
