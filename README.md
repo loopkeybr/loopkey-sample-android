@@ -12,6 +12,47 @@ If you're interested in learning more about LoopKey, contact us at loopkey@loopk
 
 ### Scanning for devices
 
+Before scanning, is necessary to add some permissions at Manifest:
+
+```
+    <!-- Location Setup -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    
+    <!-- BLE Setup -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+    <!-- Request legacy Bluetooth permissions on older devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+```
+
+Keep in mind, after Android S(SDK 31), the Bluetooth permission needs to be required at Runtime.
+Before Android S(SDK 31), to make bluetooth return their search results, the location permission is necessary and must be required in runtime.
+
+The last setup step is to add some dependencies to the Gradle file, because .aar files does not support transitive dependencies. If you use some of the dependencies below, you cannot redeclare them, and feel free to change the version to ones that meet your needs.
+
+```
+    //Coroutine
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.5.2'
+    
+    // Moshi
+    implementation "com.squareup.moshi:moshi-kotlin:1.13.0"
+    ksp("com.squareup.moshi:moshi-kotlin-codegen:1.13.0")
+
+    //Retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation "com.squareup.retrofit2:converter-moshi:2.9.0"
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.2'
+    
+    // Please, does not change this version of codec. All subsequent versions removes some important methods.
+    implementation 'commons-codec:commons-codec:1.15'
+```
+
 In order to scan for devices, your class will need to implement the ReachableDevices.Listener, for example:
 
 ```
