@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/testsTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Resumo dos Testes"
+        android:textAlignment="center"
+        android:textSize="32sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/deviceSerialTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="Serial do Dispositivo: "
+        android:textAlignment="textStart"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/testsTextView" />
+
+    <TextView
+        android:id="@+id/deviceStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Status do Dispositivo: Em Alcance"
+        app:layout_constraintEnd_toEndOf="@+id/deviceSerialTextView"
+        app:layout_constraintStart_toStartOf="@+id/deviceSerialTextView"
+        app:layout_constraintTop_toBottomOf="@+id/deviceSerialTextView" />
+
+    <TextView
+        android:id="@+id/totalTestsTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Quantidade de Testes Executados: 1000"
+        app:layout_constraintEnd_toEndOf="@+id/deviceStatus"
+        app:layout_constraintStart_toStartOf="@+id/deviceStatus"
+        app:layout_constraintTop_toBottomOf="@+id/deviceStatus" />
+
+    <TextView
+        android:id="@+id/successTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Número de Sucessos: 100"
+        app:layout_constraintEnd_toEndOf="@+id/totalTestsTextView"
+        app:layout_constraintStart_toStartOf="@+id/totalTestsTextView"
+        app:layout_constraintTop_toBottomOf="@+id/totalTestsTextView" />
+
+    <TextView
+        android:id="@+id/failTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Número de Falhas: 900"
+        app:layout_constraintEnd_toEndOf="@+id/successTextView"
+        app:layout_constraintStart_toStartOf="@+id/successTextView"
+        app:layout_constraintTop_toBottomOf="@+id/successTextView" />
+
+    <Button
+        android:id="@+id/startStopButton"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="32dp"
+        android:gravity="center"
+        android:text="Começar"
+        android:textAlignment="center"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/mediumSuccessTimeTextView" />
+
+    <TextView
+        android:id="@+id/elapsedTimeTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Tempo Decorrido de teste: 1000"
+        app:layout_constraintEnd_toEndOf="@+id/failTextView"
+        app:layout_constraintStart_toStartOf="@+id/failTextView"
+        app:layout_constraintTop_toBottomOf="@+id/failTextView" />
+
+    <TextView
+        android:id="@+id/mediumSuccessTimeTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Tempo de Execução com sucesso: 3s"
+        app:layout_constraintEnd_toEndOf="@+id/elapsedTimeTextView"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="@+id/elapsedTimeTextView"
+        app:layout_constraintTop_toBottomOf="@+id/elapsedTimeTextView" />
+</androidx.constraintlayout.widget.ConstraintLayout>
