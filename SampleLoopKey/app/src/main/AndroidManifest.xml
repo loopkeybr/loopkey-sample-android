@@ -10,6 +10,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SampleLoopKey">
         <activity
+            android:name=".MainComposableActivity"
+            android:exported="true"
+            android:label="@string/title_activity_main_composable"
+            android:theme="@style/Theme.SampleLoopKey">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

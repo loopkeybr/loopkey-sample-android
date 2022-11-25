@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id("com.google.devtools.ksp") version "1.7.20-1.0.7"
 }
 
 android {
@@ -9,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "br.com.loopkey.sample"
-        minSdk 33
+        minSdk 26
         targetSdk 33
         versionCode 1
         versionName "1.0"
@@ -34,8 +33,10 @@ android {
         jvmTarget = '1.8'
     }
     buildFeatures {
-        viewBinding = true
         compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion compose_version
     }
     packagingOptions {
         resources {
@@ -45,28 +46,30 @@ android {
 }
 
 dependencies {
-    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
 
     implementation 'androidx.core:core-ktx:1.9.0'
-    implementation 'androidx.appcompat:appcompat:1.5.1'
-    implementation 'com.google.android.material:material:1.7.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation "androidx.compose.ui:ui:$compose_version"
+    implementation "androidx.compose.material:material:$compose_version"
+    implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.5.1'
     implementation 'androidx.activity:activity-compose:1.6.1'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.4'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.0'
+    androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
+    debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
+    debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
 
-    // Moshi
-    ksp("com.squareup.moshi:moshi-kotlin-codegen:1.13.0")
+    implementation "com.google.accompanist:accompanist-permissions:0.23.1"
 
+    // LoopKey Mandatory Dependencies
+    // Please, does not change this version of codec. All subsequent versions removes some important methods.
+    implementation 'commons-codec:commons-codec:1.15'
+    implementation 'com.google.code.gson:gson:2.10'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
     implementation "com.squareup.moshi:moshi-kotlin:1.13.0"
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation "com.squareup.retrofit2:converter-moshi:2.9.0"
     implementation 'com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.2'
-
-    // Please, does not change this version of codec. All subsequent versions removes some important methods.
-    implementation 'commons-codec:commons-codec:1.15'
-    implementation 'com.google.code.gson:gson:2.10'
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
 }

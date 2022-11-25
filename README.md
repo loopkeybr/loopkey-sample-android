@@ -10,11 +10,60 @@ LoopKey to authenticate with real-world objects.
 
 If you're interested in learning more about LoopKey, contact us at loopkey@loopkey.com.br.
 
-### Scanning for devices
+## Getting Started
 
-Before scanning, is necessary to add some permissions at Manifest:
+**You will find two samples under this directory, one with Jetpack Compose(placed at ComposableSample) and one with standard activity(placed under SampleLoopKey).**
 
+To be able to scan to lockers and unlock them, some files are necessary.
+
+1. Copy the entire folder **Composable Sample > app > libs to your Project > App destination**;
+2. Copy the entire folder **Composable Sample > app > src > main > java > br > com > loopkey > sample lk, to your Project > App > src folder**;
+3. Open the class copied to your project and fix the Package Strcture;
+4. At your build.gradle placed at the root of the project(It's NOT the one placed under app folder), paste the content below or adapt the existing one to avoid problems with version mismatch of Kotlin plugin:
+
+```groovy
+buildscript {
+    ext {
+        kotlin_version = '1.7.10'
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    id 'com.android.application' version '7.2.2' apply false
+    id 'com.android.library' version '7.2.2' apply false
+    id 'org.jetbrains.kotlin.android' version '1.5.31' apply false
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
 ```
+
+5. At build.gradle placed under the app directory add the following:
+```groovy
+dependencies {
+    // LoopKey Mandatory Dependencies
+    // Please, does not change this version of codec. All subsequent versions removes some important methods.
+    implementation 'commons-codec:commons-codec:1.15'
+    implementation 'com.google.code.gson:gson:2.10'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'
+    implementation "com.squareup.moshi:moshi-kotlin:1.13.0"
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation "com.squareup.retrofit2:converter-moshi:2.9.0"
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.2'
+    // Responsible to load the /libs directory under the classpath of the application.
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+}
+```
+
+6. At your AndroidManifest.xml file, add the permissions:
+
+``` xml
     <!-- Location Setup -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -31,121 +80,125 @@ Before scanning, is necessary to add some permissions at Manifest:
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 ```
 
-Keep in mind, after Android S(SDK 31), the Bluetooth permission needs to be required at Runtime.
-Before Android S(SDK 31), to make bluetooth return their search results, the location permission is necessary and must be required in runtime.
+## Controling the Lockers
 
-The last setup step is to add some dependencies to the Gradle file, because .aar files does not support transitive dependencies. If you use some of the dependencies below, you cannot redeclare them, and feel free to change the version to ones that meet your needs.
+1. In order to scan for devices, your class will need to implement the LKScannerProtocol, for example:
 
-```
-    //Coroutine
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.5.2'
-    
-    // Moshi
-    implementation "com.squareup.moshi:moshi-kotlin:1.13.0"
-    ksp("com.squareup.moshi:moshi-kotlin-codegen:1.13.0")
-
-    //Retrofit
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation "com.squareup.retrofit2:converter-moshi:2.9.0"
-    implementation 'com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.2'
-    
-    // Please, does not change this version of codec. All subsequent versions removes some important methods.
-    implementation 'commons-codec:commons-codec:1.15'
-```
-
-In order to scan for devices, your class will need to implement the ReachableDevices.Listener, for example:
-
-```
-class Example: LKReachableDeviceListener
+```kotlin
+class Example: LKScannerProtocol
 {
-    var _reachableDevices: ReachableDevices // Reachable devices obtained via LoopKey SDK Scanner
-    var _doorModel: DoorModel // Model that represents the door you want to open
-    var _loopkeyBLEScanner: LKReachableDevice = LKReachableDeviceImpl.INSTANCE
+    var _reachableDevices: ReachableDevices = mutableListOf() // Reachable devices obtained via LoopKey SDK Scanner
+    private lateinit var _loopkeyBLEScanner: LKReachableDevice
 }
 ```
 
-Then, you will need to subcribe for notifications as soon as possible in your lifecycle (`onCreate`, `onCreateView`, etc), or when you want to start your scan process:
+2. You MUST request the instance of the scanner after your applications is fully initialized to avoid any kind of mistake that may be caused by unavailable sources during the startup time;
 
-```
-    _loopkeyBLEScanner.subscribe(this)
-```
+```kotlin
+class Example: LKScannerProtocol
+{
+    var _reachableDevices: ReachableDevices = mutableListOf() // Reachable devices obtained via LoopKey SDK Scanner
+    private lateinit var _loopkeyBLEScanner: LKReachableDevice
 
-On your `onDestroy` or when you want to stop scanning, unsubscribe for notifications:
-
-```
-    _reachableDevices.unsubscribe(this)
-```
-
-Finally, you will need to implement the `onReachableDevices()` method, wich will run every time a new device is detected or gets out of reach. It receives an array of `LKCommDevice` containing the visible devices as the scan time:
-
-```
-    override fun onReachableDevices(reachableDevices: List<LKCommDevice>) { }
-```
-
-Now you have an array of `LKCommDevice`, that you can use for your device retrieval logic.
-
-After you make sure your device is reachable, you may use commands. You may check if a door is in the reachable devices by checking if the serial of the device is in the `LKCommDevice` array, for example:
-
-```
-    fun get(serial: ByteArray): LKCommDevice?
+    override fun onViewCreated()
     {
-        synchronized(this.reachableDevices) {
-            return reachableDevices.firstOrNull { it.serial.contentEquals(serial) }
+        _loopkeyBLEScanner = LKReachableDeviceImpl.INSTANCE
+        _loopkeyBLEScanner.subscribe(this)
+    }
+}
+```
+
+3. Before requesting scanner to notify you about new lockers, be sure you have requested runtime to the user when necessary accordingly to Android Versions. The necessary permissions are different before and after Android S:
+
+```
+Before Android S
+ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, BLUETOOTH, BLUETOOTH_ADMIN
+```
+
+```
+After Android S
+ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT
+```
+
+The permissions can be requested by using the snipper below and you can change it accordingly to your needs.
+
+```kotlin
+private fun _requireBluetoothAndLocationPermissionsIfNecessary() {
+        val requestPermissionLauncher =
+            registerForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions()
+            ) { permissionsAndResults ->
+                unlockInteractor = LKUnlockDeviceInteractor(applicationContext)
+                scanner = LKScanDevices(applicationContext)
+                scanner.subscribe(this)
+            }
+        val necessaryPermissions = mutableListOf<String>()
+
+        if (!_isPermissionToLocationCoarseGranted()) {
+            necessaryPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
+
+        if (!_isBluetoothPermissionGranted(this) &&
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+        ) {
+            necessaryPermissions.add(Manifest.permission.BLUETOOTH_SCAN)
+            necessaryPermissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+
+        if (necessaryPermissions.size <= 0) {
+            unlockInteractor = LKUnlockDeviceInteractor(applicationContext)
+            scanner = LKScanDevices(applicationContext)
+            scanner.subscribe(this)
+        }
+
+        requestPermissionLauncher.launch(necessaryPermissions.toTypedArray())
     }
 ```
 
-### Using commands
+4. Finally, you will need to implement the `didUpdateVisible(visibleDevices: List<LKScanResult>)` method, wich will run every time a new device is detected or gets out of reach. It receives an array of `LKScanResult` containing the visible devices as the scan time:
 
-The next step is to set the admin and user keys to this device. You may set them directly on the `LKCommDevice` you've just retrieved. This values are obtained from LoopKey API. 
-Admin Key only is necessary if you want to perform Reset/Edit/Update of the lock, otherwhise only the property `key` must be settled.
+5. After you make sure your device is reachable, you may use commands. You may check if a door is in the reachable devices by requesting to the scanner a visible device using the serial or the lockMac:
 
-Both the keys `String`. They come as base64 encoded string from the server API.
-
+```kotlin
+    scanner.get(serialBase32, lockMac)
 ```
-    fun LKCommDevice.transform(doorModel: DoorModel)
-    {
-        if (doorModel.key.isNotEmpty()) {
-            this.key = SignatureUtils.decodeBase64(doorModel.key)
-        }
 
-        if (doorModel.adminKey.isNotEmpty()) {
-            this.adminKey = SignatureUtils.decodeBase64(doorModel.adminKey)
-        }
+6. To send the Unlock Command to the locker you must instantiate the `LKUnlockDeviceInteractor` class.
+
+```kotlin
+class Example: LKScannerProtocol
+{
+    var _reachableDevices: ReachableDevices = mutableListOf() // Reachable devices obtained via LoopKey SDK Scanner
+    private lateinit var _loopkeyBLEScanner: LKReachableDevice
+    private lateinit var _unlockInteractor: LKUnlockDeviceInteractor
+
+    override fun onViewCreated()
+    {
+        _requireBluetoothAndLocationPermissionsIfNecessary()
     }
 
+    fun onPermissionsGranted()
+    {
+        this._unlockInteractor = LKUnlockDeviceInteractor(context = applicationContext)
+        this._scanner = LKScanner(context = applicationContext)
+        _scanner.subscribe(this)
+    }
+}
 ```
 
-Then, get the communicator:
+7. To send a Unlock command to any locker you must have the fields: `lockData`, `lockMac`, `serial`, `userKey`. Some of the fields could be null accordingly to the lock type. The field Serial may come as base64 and/or base32 encoding depending on how you fetch data from the API. **By default, the Scanner and Unlock classes uses the serial as Base32.**
 
-```
-    val commandRunner = LKCommandRunner.instance
-```
+8. To send a Unlock command to a locker you simple need to call the function on the UnlockInteractor Class.
 
-Finally, create command and run then:
+```kotlin
+_unlockInteractor.unlock(serialBase32 = serialBase32,
+            lockMac = lockMac,
+            userKey = userKey,
+            lockData = lockData) { result ->
+        }
+``` 
 
-```
-    val command: LKCommand = createUnlockCommand(object : LKUnlockCommand.Listener {
-                override fun onResponse(response: LKUnlockCommand.Response?) 
-                {
-                    // The unlock occurs with success when the answer LKUnlockCommand.Response.UNLOCKED is obtained. Other options can be checked at the same enum.
-                }
-
-                override fun onError(error: LKCommand.Error?) 
-                {
-                }
-            })
-
-            command.device = commDevice // The LKCommDevice that we created previously.
-            command.userId = 0 // The identifier of the user whom is performing the action. If not appliable just send zero value
-            commandRunner.enqueue(command)
-```
-
-On `LKUnlockCommand.Listener` you can get the response of LoopKey (`UNLOCKED`, `ALREADY_OPEN`, `ALREADY_UNLOCKED`, `SYNC_ISSUE`, `NOT_CONFIGURED`, `UNKNOWN`).
-
-That's it. Your command will be run by the command runner.
-
-Note that the unlock command was used as an example, but other commands are similar. Just check the documentation on the LKCommandRepository for more information.
+If the door is not in range, you will receive and error informing about it on the result callback. All possible values of results can be found at LKDeviceUnlockInteractor.kt file.
 
 ### Retrieving data from server
 

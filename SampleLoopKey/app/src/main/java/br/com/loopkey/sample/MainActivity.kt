@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Base64
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -18,13 +17,15 @@ import br.com.loopkey.indigo.lklib.commands.LKCommandRunner
 import br.com.loopkey.indigo.lklib.commands.implementations.LKUnlockCommand
 import br.com.loopkey.indigo.lklib.core.LKReachableDevice
 import br.com.loopkey.indigo.lklib.core.LKReachableDeviceImpl
-import br.com.loopkey.indigo.lklib.core.LKReachableDeviceListener
-import br.com.loopkey.indigo.lklib.entity.LKCommDevice
 import br.com.loopkey.sample.databinding.ActivityMainBinding
+import br.com.loopkey.sample.lk.LKScanDevices
+import br.com.loopkey.sample.lk.LKScanResult
+import br.com.loopkey.sample.lk.LKScannerProtocol
+import br.com.loopkey.sample.lk.LKUnlockDeviceInteractor
 import java.util.Timer
 import java.util.TimerTask
 
-class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
+class MainActivity : AppCompatActivity(), LKScannerProtocol {
     private var _lkReachableDevice: LKReachableDevice? = null
 
     private var _isUnlocking = false
@@ -37,11 +38,13 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
 
     private var _hasTestInExecution: Boolean = false
 
-    private var _serialBase64: String = "<DOOR SERIAL ENCODED IN BASE64>"
+    private var _serialBase32: String = "LLKFAACAAACAAHFY"
 
-    private var _adminKeyBase64: String = "<ADMIN KEY ENCODED IN BASE64>"
+    private var _key64: String = "yTUmH2/Mq/8wyhz5ritkhA9dDxIbtkYhLPO/5SdYWJw="
 
-    private var _key64: String = "<USER KEY ENCODED IN BASE64>="
+    private var _lockData: String = "DUYzOJDhNGPt1NFVVUgE7yROijIeXg/Hh1HeZs0fJLvCZToZF7VLhWPMxn2ZhgnQPYyq71bzdOenQLnkFKIefP4VgaMavAp+D7TJQ6JcT7FUR5p2XUfcIh3gJ+P3BdEeg4R1qGx3km8Fw9moudswGbpjm88Z7YMHhaoJdVWjBZQK4QMDW8LP9Fq2QkvMwIBbui/LNsc1+b5b8GV2eQ7q3BJqesPuPI2CfIXnBBSZD9txIAINSBfTkqui/kj7XzL8NwP4cQ+sqQLCAyajstSezNkUCpC0+likoikBoFmcyQIC5hOwnOlSFZEy/J2IiSApqo7rZtLETKdZDuBiblmdn5WEplEH/mCO3z4C+s7yryar4hUWkfJUh55t4+63ddUWd6ZA/ArP3zawGtfjGf+iqunVScZAI9MaJ9CK14e5CZnVrSurAEky6HCMAGj6CWbqd43F+y74dKDx5e0YGYANzKn6aJTVs4k840awb9OaVzVGcnZmVRAIJExpRNF53BBun4n6ACm3APyJCpY3dY8k/Ck9RVqSyLZ3S0zTR0J/9tdk+jJYaO38Eo1hRseBxjli4cPXdKexrfL5ev/fdgmUZc/dRYEao36XZWY6vuf/eT7Ft7xYylHCmquDL5JLwM/pq/TkWus0br6MiKLcgLRVcX31SFpzy7S5edsmNSaFBKaByqoBGDZHPzjvJvCnh6Y65pX6MnCoar/4c6jMGW++v2vTX7Vcqg=="
+
+    private var _lockMac: String = "" //"6B:D3:5F:B5:5C:AA"
 
     private var _startTimeInMs: Long = 0
 
@@ -50,6 +53,9 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
     private var _timer: Timer = Timer()
 
     private var _executionTimes: MutableList<Long> = mutableListOf()
+
+    private lateinit var unlockInteractor: LKUnlockDeviceInteractor
+    private lateinit var scanner: LKScanDevices
 
     public override fun onCreate(savedInstance: Bundle?) {
         super.onCreate(savedInstance)
@@ -65,6 +71,7 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
         _lkReachableDevice = LKReachableDeviceImpl.INSTANCE
 
         _requireBluetoothAndLocationPermissionsIfNecessary()
+        binding.deviceStatus.text = "Status do Dispositivo: Fora de Alcance"
 
         binding.startStopButton.setOnClickListener {
             if (_hasTestInExecution) {
@@ -100,12 +107,12 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
                 )
             }
         }
-        binding.deviceSerialTextView.text = "Serial do Dispositivo: $_serialBase64"
+
+        binding.deviceSerialTextView.text = "Serial do Dispositivo: $_serialBase32"
     }
 
     public override fun onDestroy() {
         // Unsubscribe to notifications.
-        _lkReachableDevice?.unsubscribe(this)
         super.onDestroy()
     }
 
@@ -113,23 +120,18 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
      * Method is called whenever new broadcast information is received.
      * @param reachableDevices List of reachable LoopKey devices.
      */
-    override fun onReachableDevices(reachableDevices: List<LKCommDevice>) {
+    override fun didUpdateVisible(visibleDevices: List<LKScanResult>)
+    {
         val handler = Handler(Looper.getMainLooper())
         val runnable = Runnable {
-            if (reachableDevices.isEmpty()) {
+            if (visibleDevices.isEmpty()) {
                 binding.deviceStatus.text = "Status do Dispositivo: Fora de Alcance"
                 return@Runnable
             }
-            // Here, we obtain iterate through all the currently reachable devices.
-            val devicesIterator = reachableDevices.iterator()
-
-            while (devicesIterator.hasNext()) {
-                val device = devicesIterator.next()
-                Log.d("LKLIB", device.name ?: "LoopKey Device")
-                Log.d("LKLIB", device.rssi.toString() + Base64.encodeToString(device.rollCount, Base64.NO_WRAP))
+            val device = visibleDevices.firstOrNull { element -> element.serial == _serialBase32 }
 
                 // Fill below with serial code of device you are trying to reach.
-                if (device.serial.contentEquals(Base64.decode(_serialBase64, Base64.DEFAULT))) {
+                if (device != null) {
                     binding.deviceStatus.text = "Status do Dispositivo: Em Alcance"
                     if (_hasTestInExecution && !_isUnlocking) {
                         _isUnlocking = true
@@ -139,7 +141,6 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
                     binding.deviceStatus.text = "Status do Dispositivo: Fora de Alcance"
                 }
             }
-        }
 
         handler.post(runnable)
     }
@@ -148,49 +149,17 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
      * Sends unlock message to LoopKey device.
      * @param commDevice The device to communicate with.
      */
-    private fun _communicateUnlockOffline(commDevice: LKCommDevice) {
+    private fun _communicateUnlockOffline(commDevice: LKScanResult)
+    {
         val handler = Handler(Looper.getMainLooper())
         val runnable = Runnable {
-            commDevice.adminKey = Base64.decode(_adminKeyBase64, Base64.DEFAULT)
-            commDevice.key = Base64.decode(_key64, Base64.DEFAULT)
+            commDevice.userKey = _key64
+            commDevice.lockData = _lockData
+            commDevice.macAddress = _lockMac
 
-            val command: LKCommand = createUnlockCommand(object : LKUnlockCommand.Listener {
-                override fun onResponse(response: LKUnlockCommand.Response?) {
-                    val handler = Handler(Looper.getMainLooper())
-                    val runnable = Runnable {
-                        _executionTimes.add(System.currentTimeMillis() - _commandStartExecution)
-                        _success++
-                        binding.successTextView.text = "Número de Testes executados com sucesso: $_success"
-                        binding.failTextView.text = "Número de Testes Executados com Falha: $_failure"
-                        binding.totalTestsTextView.text = "Número Total de Testes Executados: ${_success + _failure}"
-                        binding.mediumSuccessTimeTextView.text = "Tempo médio de Execução com sucesso: ${_executionTimes.sum() / _executionTimes.size}ms"
-                        Log.d("LKLIB", "Unlock Status: Success=$_success, Failure=$_failure")
-                        _isUnlocking = false
-                    }
+            unlockInteractor.unlock(commDevice, { result ->
 
-                    handler.post(runnable)
-                }
-
-                override fun onError(error: LKCommand.Error?) {
-                    val handler = Handler(Looper.getMainLooper())
-                    val runnable = Runnable {
-                        _failure++
-                        _isUnlocking = false
-                        binding.successTextView.text = "Número de Testes executados com sucesso: $_success"
-                        binding.failTextView.text = "Número de Testes Executados com Falha: $_failure"
-                        binding.totalTestsTextView.text = "Número Total de Testes Executados: ${_success + _failure}"
-                        Log.d("LKLIB", "Unlock Status: Success=$_success, Failure=$_failure")
-                    }
-
-                    handler.post(runnable)
-                }
             })
-
-            command.device = commDevice
-            command.userId = 0
-            Log.d("LKLIB", "Enqueing Command")
-            _commandStartExecution = System.currentTimeMillis()
-            LKCommandRunner.instance.enqueue(command)
         }
 
         handler.post(runnable)
@@ -201,7 +170,9 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions()
             ) { permissionsAndResults ->
-                _lkReachableDevice?.subscribe(this)
+                unlockInteractor = LKUnlockDeviceInteractor(applicationContext)
+                scanner = LKScanDevices(applicationContext)
+                scanner.subscribe(this)
             }
         val necessaryPermissions = mutableListOf<String>()
 
@@ -217,7 +188,9 @@ class MainActivity : AppCompatActivity(), LKReachableDeviceListener {
         }
 
         if (necessaryPermissions.size <= 0) {
-            _lkReachableDevice?.subscribe(this)
+            unlockInteractor = LKUnlockDeviceInteractor(applicationContext)
+            scanner = LKScanDevices(applicationContext)
+            scanner.subscribe(this)
         }
 
         requestPermissionLauncher.launch(necessaryPermissions.toTypedArray())
